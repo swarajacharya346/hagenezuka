@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/detailBreedName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Breed: Gir"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp"/>
+
+        <ImageView
+            android:id="@+id/detailBreedImage"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/gir_sample"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:id="@+id/detailText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sample breed info: Gir is a high milk-yield breed from Gujarat..."
+            android:textSize="16sp"/>
+    </LinearLayout>
+</ScrollView>
