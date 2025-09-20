@@ -1,61 +1,77 @@
 package com.example.sih;
 
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
-import android.graphics.Color;
-import android.util.Pair;
-
-import androidx.room.jarjarred.org.stringtemplate.v4.Interpreter;
-
 import org.tensorflow.lite.Interpreter;
-import org.tensorflow.lite.support.common.FileUtil;
+
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.List;
 
 public class AIModelHelper {
 
     private Interpreter interpreter;
-    private static final int IMG_WIDTH = 224;
-    private static final int IMG_HEIGHT = 224;
-    private static final String[] CLASS_NAMES = {"Gir", "Sahiwal", "Murrah"};
-    private static final int NUM_CLASSES = 3;
+    private List<String> labels;
 
-    public AIModelHelper(Context context) {
-        try {
-            MappedByteBuffer tfliteModel = FileUtil.loadMappedFile(context, "model.tflite");
-            interpreter = new Interpreter(tfliteModel);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public AIModelHelper(Context context, String modelPath, List<String> labels) throws IOException {
+        this.interpreter = new Interpreter(loadModelFile(context, modelPath));
+        this.labels = labels;
     }
 
-    public Pair<String, Float> predict(Bitmap bitmap) {
-        float[][][][] input = preprocessBitmap(bitmap);
-        float[][] output = new float[1][NUM_CLASSES];
+    private MappedByteBuffer loadModelFile(Context context, String modelPath) throws IOException {
+        AssetFileDescriptor fileDescriptor = context.getAssets().openFd(modelPath);
+        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+        FileChannel fileChannel = inputStream.getChannel();
+        long startOffset = fileDescriptor.getStartOffset();
+        long declaredLength = fileDescriptor.getDeclaredLength();
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+    }
+
+    public Prediction predict(Bitmap bitmap) {
+        // Resize or preprocess bitmap as needed for your model
+        int inputSize = 224; // example
+        Bitmap scaled = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, false);
+
+        float[][] output = new float[1][labels.size()]; // model output array
+        float[] input = bitmapToFloatArray(scaled);
+
         interpreter.run(input, output);
 
-        int maxIndex = 0;
-        float maxVal = output[0][0];
-        for (int i = 1; i < NUM_CLASSES; i++) {
-            if (output[0][i] > maxVal) {
-                maxVal = output[0][i];
-                maxIndex = i;
-            }
+        // Find the label with max confidence
+        int maxIdx = 0;
+        for (int i = 1; i < output[0].length; i++) {
+            if (output[0][i] > output[0][maxIdx]) maxIdx = i;
         }
-        return new Pair<>(CLASS_NAMES[maxIndex], maxVal);
+
+        return new Prediction(labels.get(maxIdx), output[0][maxIdx]);
     }
 
-    private float[][][][] preprocessBitmap(Bitmap bitmap) {
-        Bitmap resized = Bitmap.createScaledBitmap(bitmap, IMG_WIDTH, IMG_HEIGHT, true);
-        float[][][][] input = new float[1][IMG_WIDTH][IMG_HEIGHT][3];
-        for (int x = 0; x < IMG_WIDTH; x++) {
-            for (int y = 0; y < IMG_HEIGHT; y++) {
-                int px = resized.getPixel(x, y);
-                input[0][x][y][0] = Color.red(px) / 255f;
-                input[0][x][y][1] = Color.green(px) / 255f;
-                input[0][x][y][2] = Color.blue(px) / 255f;
-            }
+    private float[] bitmapToFloatArray(Bitmap bitmap) {
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+        float[] floatValues = new float[width * height * 3];
+        int[] intValues = new int[width * height];
+        bitmap.getPixels(intValues, 0, width, 0, 0, width, height);
+
+        for (int i = 0; i < intValues.length; i++) {
+            int val = intValues[i];
+            floatValues[i * 3] = ((val >> 16) & 0xFF) / 255.f;
+            floatValues[i * 3 + 1] = ((val >> 8) & 0xFF) / 255.f;
+            floatValues[i * 3 + 2] = (val & 0xFF) / 255.f;
         }
-        return input;
+        return floatValues;
+    }
+
+    public static class Prediction {
+        public final String label;
+        public final float confidence;
+
+        public Prediction(String label, float confidence) {
+            this.label = label;
+            this.confidence = confidence;
+        }
     }
 }

@@ -1,49 +1,93 @@
 package com.example.sih;
 
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
+import android.Manifest;
 import android.content.Intent;
-import android.graphics.Bitmap;
+import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
-import android.provider.MediaStore;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.util.Pair;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.ImageCapture;
+import androidx.camera.core.ImageCaptureException;
+import androidx.camera.core.Preview;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.camera.view.PreviewView;
+import androidx.core.content.ContextCompat;
+import com.google.common.util.concurrent.ListenableFuture;
+
+import java.io.File;
+import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
-
-    private static final int CAMERA_REQUEST_CODE = 1001;
-    private ImageView imageView;
-    private AIModelHelper aiModelHelper;
+    private PreviewView previewView;
+    private Button captureBtn;
+    private ImageView capturedImage;
+    private ImageCapture imageCapture;
+    private static final int REQUEST_CAMERA_PERMISSION = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        previewView = findViewById(R.id.previewView);
+        captureBtn = findViewById(R.id.captureBtn);
+        capturedImage = findViewById(R.id.capturedImage);
 
-        imageView = findViewById(R.id.capturedImage);
-        Button captureBtn = findViewById(R.id.captureBtn);
-        aiModelHelper = new AIModelHelper(this);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            startCamera();
+        } else {
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
+        }
 
-        captureBtn.setOnClickListener(v -> {
-            Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            startActivityForResult(cameraIntent, CAMERA_REQUEST_CODE);
+        captureBtn.setOnClickListener(v -> takePhoto());
+    }
+
+    private void startCamera() {
+        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
+        cameraProviderFuture.addListener(() -> {
+            try {
+                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                Preview preview = new Preview.Builder().build();
+                imageCapture = new ImageCapture.Builder().build();
+                CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
+                preview.setSurfaceProvider(previewView.getSurfaceProvider());
+                cameraProvider.unbindAll();
+                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
+            } catch (ExecutionException | InterruptedException e) {
+                Log.e("SIH", "Camera start failed", e);
+            }
+        }, ContextCompat.getMainExecutor(this));
+    }
+
+    private void takePhoto() {
+        if (imageCapture == null) return;
+        File photoFile = new File(getCacheDir(), "capture-" + System.currentTimeMillis() + ".jpg");
+        ImageCapture.OutputFileOptions options = new ImageCapture.OutputFileOptions.Builder(photoFile).build();
+        imageCapture.takePicture(options, ContextCompat.getMainExecutor(this), new ImageCapture.OnImageSavedCallback() {
+            @Override public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
+                Uri savedUri = Uri.fromFile(photoFile);
+                // show preview
+                capturedImage.setImageURI(savedUri);
+                // pass to ResultActivity
+                Intent intent = new Intent(MainActivity.this, ResultActivity.class);
+                intent.setData(savedUri);
+                startActivity(intent);
+            }
+            @Override public void onError(@NonNull ImageCaptureException exception) {
+                Log.e("SIH", "Photo capture failed: " + exception.getMessage(), exception);
+            }
         });
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == CAMERA_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
-            Bitmap photo = (Bitmap) data.getExtras().get("data");
-            imageView.setImageBitmap(photo);
-
-            // Run AI prediction
-            Pair<String, Float> result = aiModelHelper.predict(photo);
-            Intent intent = new Intent(this, ResultActivity.class);
-            intent.putExtra("breed", result.first);
-            intent.putExtra("confidence", result.second);
-            startActivity(intent);
+    @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED) startCamera();
         }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 }
