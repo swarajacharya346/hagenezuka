@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
-             xmlns:app="http://schemas.android.com/apk/res-auto"
-             android:id="@+id/nav_graph">
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/cameraFragment">
 
+    <!-- Camera / Main fragment -->
+    <fragment
+        android:id="@+id/cameraFragment"
+        android:name="com.example.sih.CameraFragment"
+        android:label="Camera" />
+
+    <!-- History fragment -->
+    <fragment
+        android:id="@+id/historyFragment"
+        android:name="com.example.sih.HistoryFragment"
+        android:label="History" />
+
+    <!-- Profile fragment -->
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.example.sih.ProfileFragment"
+        android:label="Profile" />
 </navigation>

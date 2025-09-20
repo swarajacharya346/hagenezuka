@@ -59,6 +59,8 @@ dependencies {
 
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+
+    // Activity (downgraded to support compileSdk 34)
     implementation("androidx.activity:activity-ktx:1.9.2")
 
     // Guava

@@ -2,11 +2,14 @@ package com.example.sih;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.Arrays;
@@ -22,7 +25,7 @@ public class ResultActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.result_screen); // match your XML filename
+        setContentView(R.layout.result_screen);
 
         // Bind views
         resultImage = findViewById(R.id.resultImage);
@@ -31,42 +34,50 @@ public class ResultActivity extends AppCompatActivity {
         confirmBtn = findViewById(R.id.confirmBtn);
         retakeBtn = findViewById(R.id.retakeBtn);
 
-        // Load AI model and labels
+        // Load captured bitmap
+        Uri imageUri = getIntent().getData();
+        Bitmap bmp = null;
+        if (imageUri != null) {
+            try {
+                bmp = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (bmp == null) {
+            bmp = Bitmap.createBitmap(224, 224, Bitmap.Config.ARGB_8888);
+        }
+
+        resultImage.setImageBitmap(bmp);
+
+        // Load AI model
         List<String> labels = Arrays.asList("cat", "dog", "parrot"); // replace with your labels
         try {
             aiHelper = new AIModelHelper(this, "model.tflite", labels);
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "AI model load failed!", Toast.LENGTH_SHORT).show();
-            return;
+            aiHelper = null;
         }
 
-        // Example bitmap (replace with actual captured image)
-        Bitmap bmp = getCapturedBitmap();
-        resultImage.setImageBitmap(bmp);
-
-        // Predict
-        AIModelHelper.Prediction prediction = aiHelper.predict(bmp);
-        breedName.setText("Breed: " + prediction.label);
-        confidence.setText("Confidence: " + prediction.confidence + "%");
+        // Predict safely
+        if (aiHelper != null) {
+            AIModelHelper.Prediction prediction = aiHelper.predict(bmp);
+            breedName.setText("Breed: " + prediction.label);
+            confidence.setText("Confidence: " + prediction.confidence + "%");
+        } else {
+            breedName.setText("Breed: Unknown");
+            confidence.setText("Confidence: 0%");
+        }
 
         // Confirm button
         confirmBtn.setOnClickListener(v -> {
             Toast.makeText(this, "Result confirmed!", Toast.LENGTH_SHORT).show();
-            // Do something like save result
+            // TODO: save to Firebase here
             finish();
         });
 
         // Retake button
-        retakeBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(this, MainActivity.class); // change to your camera activity
-            startActivity(intent);
-            finish();
-        });
-    }
-
-    private Bitmap getCapturedBitmap() {
-        // TODO: Replace with actual captured image from camera or gallery
-        return Bitmap.createBitmap(224, 224, Bitmap.Config.ARGB_8888);
+        retakeBtn.setOnClickListener(v -> finish()); // Go back to CameraFragment / MainActivity
     }
 }
