@@ -1,6 +1,5 @@
 package com.example.sih;
 
-import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -12,15 +11,13 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import java.util.Arrays;
-import java.util.List;
-
 public class ResultActivity extends AppCompatActivity {
 
     private AIModelHelper aiHelper;
     private ImageView resultImage;
     private TextView breedName, confidence;
     private Button confirmBtn, retakeBtn;
+    private static final int INPUT_SIZE = 224; // must match your model
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,26 +42,24 @@ public class ResultActivity extends AppCompatActivity {
             }
         }
         if (bmp == null) {
-            bmp = Bitmap.createBitmap(224, 224, Bitmap.Config.ARGB_8888);
+            bmp = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
         }
-
         resultImage.setImageBitmap(bmp);
 
-        // Load AI model
-        List<String> labels = Arrays.asList("cat", "dog", "parrot"); // replace with your labels
+        // Load AI model and labels dynamically
         try {
-            aiHelper = new AIModelHelper(this, "model.tflite", labels);
+            aiHelper = new AIModelHelper(this, "model.tflite", "labels.txt", INPUT_SIZE);
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "AI model load failed!", Toast.LENGTH_SHORT).show();
             aiHelper = null;
         }
 
-        // Predict safely
+        // Make prediction
         if (aiHelper != null) {
             AIModelHelper.Prediction prediction = aiHelper.predict(bmp);
             breedName.setText("Breed: " + prediction.label);
-            confidence.setText("Confidence: " + prediction.confidence + "%");
+            confidence.setText(String.format("Confidence: %.2f%%", prediction.confidence * 100));
         } else {
             breedName.setText("Breed: Unknown");
             confidence.setText("Confidence: 0%");
